@@ -1,0 +1,11 @@
+# arm64 架构源
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal-security main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal-backports main restricted universe multiverse
+
+# amd64 架构源
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse

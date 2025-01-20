@@ -1,0 +1,132 @@
+services:
+  # 基础服务，可根据情况替换成第三方
+  redis:
+    image: registry.cn-hangzhou.aliyuncs.com/gq-docker/redis-amd:6.2-rc3-alpine3.13
+    container_name: wvp_redis
+    restart: always
+    networks:
+      - wvp_net
+    environment:
+      TZ: ${TZ}
+    ports:
+      - "6379:6379"
+    volumes:
+      - ${REDIS_DATA}:/data
+      - ${REDIS_LOG}:/logs
+    command: redis-server --port 6379 --requirepass ${REDIS_PASSWORD} --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mysql:
+    image: registry.cn-hangzhou.aliyuncs.com/gq-docker/mysql-amd:8.0
+    container_name: wvp_mysql
+    restart: always
+    networks:
+      - wvp_net
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: wvp
+      MYSQL_ROOT_HOST: '%'
+      SQL_MODE: "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+    volumes:
+      - ./config/mysql/:/etc/mysql/conf.d
+      - ./config/initSql/:/docker-entrypoint-initdb.d/
+      - mysql_data:/var/lib/mysql:rw
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  zlm:
+    image: registry.cn-hangzhou.aliyuncs.com/gq-docker/zlmediakit-amd:master
+    container_name: wvp_zlm
+    restart: always
+    networks:
+      - wvp_net
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${BASE_PATH}/config/zlm/config.ini:/opt/media/conf/config.ini
+      - ${RECORD_PATH}:/opt/wvp/record
+    ports:
+      - "${STREAM_PORT}:${STREAM_PORT}/udp"
+      - "${STREAM_PORT}:${STREAM_PORT}/tcp"
+      - "3001:3001"
+      - "50502-50600:50502-50600"
+      - "1935:1935"
+      - "554:554"
+      - "8000:8000"
+      - "9000:9000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # 主要服务
+  wvp:
+    image: registry.cn-hangzhou.aliyuncs.com/gq-docker/wvp-amd:latest
+    container_name: wvp_server
+    restart: always
+    networks:
+      - wvp_net
+    environment:
+      TZ: ${TZ}
+      SIP_DOMAIN: ${SIP_DOMAIN}
+      SIP_ID: ${SIP_ID}
+      SIP_PASSWORD: ${SIP_PASSWORD}
+      WVP_IP: ${WVP_IP}
+      SIP_IP: ${SIP_IP}
+      SHOW_IP: ${SHOW_IP}
+      SDP_IP: ${SDP_IP}
+      ZLM_IP: ${ZLM_IP}
+      WVP_DB_PATH: ${WVP_DB_PATH}
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PWD: ${REDIS_PASSWORD}
+      STREAM_HOST: ${STREAM_HOST}
+      DRUID_USER: ${DRUID_USER}
+      DRUID_PASS: ${DRUID_PASS}
+      JT1078_PORT: ${JT1078_PORT}
+      JT1078_PASS: ${JT1078_PASS}
+    volumes:
+      - ./config/wvp:/config
+      - ${BASE_PATH}/logs/wvp:/opt/wvp/logs # 保存wvp日志
+    depends_on:
+      zlm:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5060:5060"
+      - "5060:5060/udp"
+      - "${JT1078_PORT}:${JT1078_PORT}"
+      - "${JT1078_PORT}:${JT1078_PORT}/udp"
+      - "18080:18080"
+
+volumes:
+  mysql_data:
+
+networks:
+  wvp_net:
+    driver: bridge
